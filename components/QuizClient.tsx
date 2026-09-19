@@ -1,91 +1,205 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
     ArrowRight,
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
     Clock3,
     RotateCcw,
+    Send,
     XCircle,
-    ClipboardCheck,
-    AlertCircle,
-    ChevronDown,
 } from "lucide-react";
-
-import { useEffect, useMemo, useState } from "react";
 
 import type { Test } from "@/lib/types";
 
-type QuizClientProps = {
-    test: Test;
-};
-
 type QuizMode = "attempt" | "review" | "result";
 
-export default function QuizClient({
-    test,
-}: QuizClientProps) {
-    const [current, setCurrent] = useState(0);
+interface QuizClientProps {
+    test: Test;
+}
 
-    const [answers, setAnswers] = useState<
-        (number | null)[]
-    >(test.questions.map(() => null));
+const SECONDS_PER_QUESTION = 30;
 
-    const [mode, setMode] =
-        useState<QuizMode>("attempt");
-
-    const SECONDS_PER_QUESTION = 30;
-
+export default function QuizClient({ test }: QuizClientProps) {
     const totalTestSeconds =
         test.questions.length * SECONDS_PER_QUESTION;
 
+    const [mode, setMode] = useState<QuizMode>("attempt");
     const [secondsLeft, setSecondsLeft] =
         useState(totalTestSeconds);
+
+    const [answers, setAnswers] = useState<(number | null)[]>(
+        () => test.questions.map(() => null)
+    );
+
+    const [currentQuestion, setCurrentQuestion] = useState(0);
 
     const [expandedQuestion, setExpandedQuestion] =
         useState<number | null>(null);
 
-    const question = test.questions[current];
-
     /*
-     * --------------------------------------------------
+     * ---------------------------------------------------------
      * TIMER
-     * --------------------------------------------------
+     * ---------------------------------------------------------
      */
 
     useEffect(() => {
-        if (mode !== "attempt") {
+        if (mode !== "attempt") return;
+
+        if (secondsLeft <= 0) {
+            setMode("review");
             return;
         }
 
         const timer = window.setInterval(() => {
-            setSecondsLeft((seconds) => {
-                if (seconds <= 1) {
+            setSecondsLeft((previous) => {
+                if (previous <= 1) {
                     window.clearInterval(timer);
-
-                    setMode("review");
-
                     return 0;
                 }
 
-                return seconds - 1;
+                return previous - 1;
             });
         }, 1000);
 
-        return () => {
-            window.clearInterval(timer);
-        };
-    }, [mode]);
+        return () => window.clearInterval(timer);
+    }, [mode, secondsLeft]);
 
     /*
-     * --------------------------------------------------
-     * SCORE
+     * ---------------------------------------------------------
+     * FORMAT TIMER
+     * ---------------------------------------------------------
+     */
+
+    const formattedTime = useMemo(() => {
+        const hours = Math.floor(secondsLeft / 3600);
+        const minutes = Math.floor((secondsLeft % 3600) / 60);
+        const seconds = secondsLeft % 60;
+
+        if (hours > 0) {
+            return `${String(hours).padStart(2, "0")}:${String(
+                minutes
+            ).padStart(2, "0")}:${String(seconds).padStart(
+                2,
+                "0"
+            )}`;
+        }
+
+        return `${String(minutes).padStart(2, "0")}:${String(
+            seconds
+        ).padStart(2, "0")}`;
+    }, [secondsLeft]);
+
+    /*
+     * ---------------------------------------------------------
+     * ANSWER HELPERS
+     * ---------------------------------------------------------
+     */
+
+    const handleAnswer = (optionIndex: number) => {
+        if (mode !== "attempt") return;
+
+        setAnswers((previous) => {
+            const updated = [...previous];
+            updated[currentQuestion] = optionIndex;
+            return updated;
+        });
+    };
+
+    const answeredCount = answers.filter(
+        (answer) => answer !== null
+    ).length;
+
+    const unansweredCount =
+        test.questions.length - answeredCount;
+
+    /*
+     * ---------------------------------------------------------
+     * NAVIGATION
+     * ---------------------------------------------------------
+     */
+
+    const handlePrevious = () => {
+        setCurrentQuestion((previous) =>
+            Math.max(previous - 1, 0)
+        );
+    };
+
+    const handleNext = () => {
+        setCurrentQuestion((previous) =>
+            Math.min(
+                previous + 1,
+                test.questions.length - 1
+            )
+        );
+    };
+
+    /*
+     * ---------------------------------------------------------
+     * CONTINUE TEST
+     * ---------------------------------------------------------
      *
-     * Correct   = +1
-     * Wrong     = -0.25
-     * Unattempt = 0
-     * --------------------------------------------------
+     * Continue Test takes the user back from the review
+     * screen to the test.
+     */
+
+    const handleContinue = () => {
+        setMode("attempt");
+    };
+
+    /*
+     * ---------------------------------------------------------
+     * SUBMIT TEST
+     * ---------------------------------------------------------
+     */
+
+    const handleSubmit = () => {
+        setMode("review");
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
+
+    const handleConfirmSubmit = () => {
+        setMode("result");
+        setExpandedQuestion(null);
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
+
+    /*
+     * ---------------------------------------------------------
+     * RESTART TEST
+     * ---------------------------------------------------------
+     */
+
+    const handleRestart = () => {
+        setAnswers(test.questions.map(() => null));
+        setCurrentQuestion(0);
+        setSecondsLeft(totalTestSeconds);
+        setExpandedQuestion(null);
+        setMode("attempt");
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
+
+    /*
+     * ---------------------------------------------------------
+     * SCORE
+     * +1 correct
+     * -0.25 wrong
+     * 0 unattempted
+     * ---------------------------------------------------------
      */
 
     const score = useMemo(() => {
@@ -93,51 +207,28 @@ export default function QuizClient({
             (total, question, index) => {
                 const userAnswer = answers[index];
 
-                // Unattempted
                 if (userAnswer === null) {
                     return total;
                 }
 
-                // Correct
                 if (
                     userAnswer === question.correctAnswer
                 ) {
                     return total + 1;
                 }
 
-                // Wrong
                 return total - 0.25;
             },
             0
         );
     }, [answers, test.questions]);
 
-    /*
-     * --------------------------------------------------
-     * CORRECT / WRONG / ATTEMPTED COUNTS
-     * --------------------------------------------------
-     */
-
     const correctCount = useMemo(() => {
         return test.questions.reduce(
             (total, question, index) => {
-                return answers[index] ===
-                    question.correctAnswer
-                    ? total + 1
-                    : total;
-            },
-            0
-        );
-    }, [answers, test.questions]);
-
-    const wrongCount = useMemo(() => {
-        return test.questions.reduce(
-            (total, question, index) => {
-                const userAnswer = answers[index];
-
                 if (
-                    userAnswer !== null &&
-                    userAnswer !== question.correctAnswer
+                    answers[index] !== null &&
+                    answers[index] === question.correctAnswer
                 ) {
                     return total + 1;
                 }
@@ -148,1141 +239,893 @@ export default function QuizClient({
         );
     }, [answers, test.questions]);
 
-    const answered = answers.filter(
-        (answer) => answer !== null
-    ).length;
+    const wrongCount = useMemo(() => {
+        return test.questions.reduce(
+            (total, question, index) => {
+                if (
+                    answers[index] !== null &&
+                    answers[index] !== question.correctAnswer
+                ) {
+                    return total + 1;
+                }
 
-    const unanswered =
-        test.questions.length - answered;
-
-    /*
-     * --------------------------------------------------
-     * SCORE FORMATTING
-     * --------------------------------------------------
-     */
-
-    const scoreDisplay = Number.isInteger(score)
-        ? score.toString()
-        : score.toFixed(2);
-
-    const percentage = Math.round(
-        (score / test.questions.length) * 100
-    );
-
-    /*
-     * --------------------------------------------------
-     * TIMER FORMATTING
-     * --------------------------------------------------
-     */
-
-    const minutes = Math.floor(
-        secondsLeft / 60
-    );
-
-    const seconds = secondsLeft % 60;
-
-    const formattedTime =
-        `${String(minutes).padStart(2, "0")}:${String(
-            seconds
-        ).padStart(2, "0")}`;
-
-    /*
-     * --------------------------------------------------
-     * ANSWER SELECTION
-     * --------------------------------------------------
-     */
-
-    function chooseAnswer(index: number) {
-        if (mode !== "attempt") {
-            return;
-        }
-
-        const newAnswers = [...answers];
-
-        newAnswers[current] = index;
-
-        setAnswers(newAnswers);
-    }
-
-    /*
-     * --------------------------------------------------
-     * NAVIGATION
-     * --------------------------------------------------
-     */
-
-    function nextQuestion() {
-        if (
-            current <
-            test.questions.length - 1
-        ) {
-            setCurrent((value) => value + 1);
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-            });
-        }
-    }
-
-    function previousQuestion() {
-        if (current > 0) {
-            setCurrent((value) => value - 1);
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-            });
-        }
-    }
-
-    /*
-     * --------------------------------------------------
-     * REVIEW
-     * --------------------------------------------------
-     */
-
-    function openReview() {
-        setMode("review");
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-        });
-    }
-
-    /*
-     * --------------------------------------------------
-     * SUBMIT
-     * --------------------------------------------------
-     */
-
-    function submitTest() {
-        setMode("result");
-
-        setExpandedQuestion(null);
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-        });
-    }
-
-    /*
-     * --------------------------------------------------
-     * CONTINUE TEST
-     * --------------------------------------------------
-     */
-
-    function continueTest() {
-        setMode("attempt");
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-        });
-    }
-
-    /*
-     * --------------------------------------------------
-     * RESTART
-     * --------------------------------------------------
-     */
-
-    function restartTest() {
-        setAnswers(
-            test.questions.map(() => null)
+                return total;
+            },
+            0
         );
+    }, [answers, test.questions]);
 
-        setCurrent(0);
+    const attemptedCount = correctCount + wrongCount;
 
-        setMode("attempt");
-
-        setExpandedQuestion(null);
-
-        setSecondsLeft(totalTestSeconds);
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-        });
-    }
+    const percentage =
+        test.questions.length > 0
+            ? (score / test.questions.length) * 100
+            : 0;
 
     /*
-     * ==================================================
-     * RESULT PAGE
-     * ==================================================
+     * ---------------------------------------------------------
+     * CURRENT QUESTION
+     * ---------------------------------------------------------
      */
 
-    if (mode === "result") {
+    const question = test.questions[currentQuestion];
+
+    /*
+     * ---------------------------------------------------------
+     * ATTEMPT MODE
+     * ---------------------------------------------------------
+     */
+
+    if (mode === "attempt") {
         return (
-            <main>
-                <QuizHeader
-                    title={test.title}
-                    time={null}
-                />
-
-                <section className="quiz-container">
-                    <div className="result-card">
-
-                        {/* RESULT HEADER */}
-
-                        <div className="result-header">
-
-                            <div className="result-icon">
-                                <CheckCircle2 size={30} />
-                            </div>
-
-                            <p className="result-label">
-                                TEST COMPLETED
-                            </p>
-
-                            <h1 className="result-score">
-                                {scoreDisplay}
-
-                                <span>
-                                    / {test.questions.length}
-                                </span>
+            <main className="min-h-screen bg-[#f7f7fa]">
+                {/* Header */}
+                <header className="sticky top-0 z-40 border-b bg-white">
+                    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                        <div>
+                            <h1 className="text-base font-bold text-[#17171c] sm:text-lg">
+                                {test.title}
                             </h1>
 
-                            <p className="result-percentage">
-                                {percentage}% Score
+                            <p className="hidden text-xs text-[#697386] sm:block">
+                                {answeredCount} of{" "}
+                                {test.questions.length} answered
                             </p>
+                        </div>
 
-                            {/* SCORE BREAKDOWN */}
+                        <div
+                            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${secondsLeft <= 60
+                                    ? "bg-red-50 text-red-600"
+                                    : "bg-[#f0efff] text-[#5b4bdb]"
+                                }`}
+                        >
+                            <Clock3 size={18} />
 
-                            <div className="result-marking-info">
+                            <span>{formattedTime}</span>
+                        </div>
+                    </div>
+                </header>
 
+                <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+                    {/* =================================================
+                        TOP ACTION BAR
+                    ================================================= */}
+
+                    <div className="sticky top-16 z-30 mb-5 rounded-2xl border border-[#e5e5eb] bg-white/95 p-3 shadow-sm backdrop-blur-md sm:top-16 sm:p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            {/* Question Counter */}
+                            <div className="flex items-center justify-between sm:justify-start">
                                 <div>
-                                    <span className="marking-positive">
-                                        +1
-                                    </span>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-[#697386]">
+                                        Current Question
+                                    </p>
 
-                                    <span>
-                                        Correct Answer
-                                    </span>
+                                    <p className="mt-0.5 text-sm font-bold text-[#17171c]">
+                                        Question{" "}
+                                        {currentQuestion + 1}{" "}
+                                        of{" "}
+                                        {test.questions.length}
+                                    </p>
                                 </div>
 
-                                <div>
-                                    <span className="marking-negative">
-                                        −0.25
-                                    </span>
-
-                                    <span>
-                                        Wrong Answer
-                                    </span>
+                                <div className="ml-auto rounded-lg bg-[#f5f5f8] px-3 py-1.5 text-xs font-semibold text-[#697386] sm:hidden">
+                                    {answeredCount}/
+                                    {test.questions.length}
                                 </div>
-
-                                <div>
-                                    <span className="marking-neutral">
-                                        0
-                                    </span>
-
-                                    <span>
-                                        Unattempted
-                                    </span>
-                                </div>
-
                             </div>
 
-                            {/* RESULT STATS */}
-
-                            <div className="result-stats">
-
-                                <div>
-                                    <strong>
-                                        {correctCount}
-                                    </strong>
-
-                                    <span>
-                                        Correct
-                                    </span>
-
-                                    <small>
-                                        +{correctCount}
-                                    </small>
-                                </div>
-
-                                <div>
-                                    <strong>
-                                        {wrongCount}
-                                    </strong>
-
-                                    <span>
-                                        Wrong
-                                    </span>
-
-                                    <small>
-                                        −
-                                        {(wrongCount * 0.25).toFixed(
-                                            2
-                                        )}
-                                    </small>
-                                </div>
-
-                                <div>
-                                    <strong>
-                                        {answered}
-                                    </strong>
-
-                                    <span>
-                                        Attempted
-                                    </span>
-
-                                    <small>
-                                        {unanswered} skipped
-                                    </small>
-                                </div>
-
-                            </div>
-
-                            {/* ACTIONS */}
-
-                            <div className="result-actions">
-
+                            {/* Action Buttons */}
+                            <div className="flex w-full gap-2 sm:w-auto">
                                 <button
-                                    onClick={restartTest}
-                                    className="secondary-button"
+                                    type="button"
+                                    onClick={handlePrevious}
+                                    disabled={
+                                        currentQuestion === 0
+                                    }
+                                    className="quiz-action-btn flex-1 border border-[#dedee6] bg-white text-[#454554] hover:bg-[#f7f7fa] disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
                                 >
-                                    <RotateCcw size={17} />
-                                    Retake Test
+                                    <ArrowLeft size={17} />
+                                    <span>Previous</span>
                                 </button>
 
-                                <Link
-                                    href="/tests"
-                                    className="primary-button"
-                                >
-                                    Other Tests
-                                </Link>
-
+                                {currentQuestion <
+                                    test.questions.length -
+                                    1 ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleNext}
+                                        className="quiz-action-btn flex-1 bg-[#5b4bdb] text-white hover:bg-[#4939c5] sm:flex-none"
+                                    >
+                                        <span>
+                                            Next Question
+                                        </span>
+                                        <ArrowRight
+                                            size={17}
+                                        />
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        className="quiz-action-btn flex-1 bg-[#5b4bdb] text-white hover:bg-[#4939c5] sm:flex-none"
+                                    >
+                                        <Send size={17} />
+                                        <span>
+                                            Submit Test
+                                        </span>
+                                    </button>
+                                )}
                             </div>
-
                         </div>
+                    </div>
 
-                        {/* SOLUTIONS */}
+                    {/* =================================================
+                        QUESTION AREA
+                    ================================================= */}
 
-                        <div className="solutions-section">
+                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+                        <section>
+                            <article className="rounded-2xl border border-[#e5e5eb] bg-white p-5 shadow-sm sm:p-7">
+                                {/* Question Number */}
+                                <div className="mb-5 flex items-center justify-between">
+                                    <span className="rounded-lg bg-[#f0efff] px-3 py-1.5 text-xs font-bold text-[#5b4bdb]">
+                                        Question{" "}
+                                        {currentQuestion + 1}
+                                    </span>
 
-                            <div className="section-heading">
-                                <h2>
-                                    Answers & Solutions
+                                    <span className="text-xs font-medium text-[#697386]">
+                                        +1 Correct · -0.25
+                                        Wrong
+                                    </span>
+                                </div>
+
+                                {/* Question */}
+                                <h2 className="text-lg font-bold leading-8 text-[#17171c] sm:text-xl">
+                                    {question.question}
                                 </h2>
 
-                                <p>
-                                    Click any question to view
-                                    your answer, correct answer
-                                    and explanation.
-                                </p>
-                            </div>
+                                {/* Options */}
+                                <div className="mt-7 space-y-3">
+                                    {question.options.map(
+                                        (
+                                            option,
+                                            optionIndex
+                                        ) => {
+                                            const selected =
+                                                answers[
+                                                currentQuestion
+                                                ] ===
+                                                optionIndex;
 
-                            <div className="solutions-list">
-
-                                {test.questions.map(
-                                    (question, index) => {
-                                        const userAnswer =
-                                            answers[index];
-
-                                        const isCorrect =
-                                            userAnswer ===
-                                            question.correctAnswer;
-
-                                        const isUnattempted =
-                                            userAnswer === null;
-
-                                        const isExpanded =
-                                            expandedQuestion === index;
-
-                                        return (
-                                            <article
-                                                key={question.id}
-                                                className={`solution-card ${isCorrect
-                                                    ? "solution-correct"
-                                                    : isUnattempted
-                                                        ? "solution-unattempted"
-                                                        : "solution-wrong"
-                                                    }`}
-                                            >
-
-                                                {/* CLICKABLE QUESTION HEADER */}
-
+                                            return (
                                                 <button
+                                                    key={
+                                                        optionIndex
+                                                    }
                                                     type="button"
-                                                    className="solution-question solution-question-button"
                                                     onClick={() =>
-                                                        setExpandedQuestion(
-                                                            isExpanded
-                                                                ? null
-                                                                : index
+                                                        handleAnswer(
+                                                            optionIndex
                                                         )
                                                     }
+                                                    className={`flex min-h-[58px] w-full items-center gap-4 rounded-xl border p-4 text-left transition ${selected
+                                                            ? "border-[#5b4bdb] bg-[#f0efff] text-[#5b4bdb]"
+                                                            : "border-[#e3e3e9] bg-white text-[#30303a] hover:border-[#c8c5f5] hover:bg-[#fafaff]"
+                                                        }`}
                                                 >
-
-                                                    <div className="solution-status">
-
-                                                        {isUnattempted ? (
-                                                            <AlertCircle
-                                                                size={23}
-                                                            />
-                                                        ) : isCorrect ? (
-                                                            <CheckCircle2
-                                                                size={23}
-                                                            />
-                                                        ) : (
-                                                            <XCircle
-                                                                size={23}
-                                                            />
-                                                        )}
-
-                                                    </div>
-
-                                                    <div className="solution-question-content">
-
-                                                        <span className="question-number">
-                                                            QUESTION{" "}
-                                                            {index + 1}
-                                                        </span>
-
-                                                        <h3>
-                                                            {question.question}
-                                                        </h3>
-
-                                                        <span
-                                                            className={`answer-result-text ${isUnattempted
-                                                                ? "result-unattempted"
-                                                                : isCorrect
-                                                                    ? "result-correct"
-                                                                    : "result-wrong"
-                                                                }`}
-                                                        >
-                                                            {isUnattempted
-                                                                ? "Not Attempted · 0"
-                                                                : isCorrect
-                                                                    ? "Correct Answer · +1"
-                                                                    : "Wrong Answer · -0.25"}
-                                                        </span>
-
-                                                    </div>
-
-                                                    <ChevronDown
-                                                        size={21}
-                                                        className={`solution-chevron ${isExpanded
-                                                            ? "solution-chevron-open"
-                                                            : ""
+                                                    <span
+                                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${selected
+                                                                ? "border-[#5b4bdb] bg-[#5b4bdb] text-white"
+                                                                : "border-[#d8d8e0] bg-white text-[#697386]"
                                                             }`}
-                                                    />
+                                                    >
+                                                        {String.fromCharCode(
+                                                            65 +
+                                                            optionIndex
+                                                        )}
+                                                    </span>
 
+                                                    <span className="text-sm font-medium leading-6 sm:text-base">
+                                                        {option}
+                                                    </span>
                                                 </button>
+                                            );
+                                        }
+                                    )}
+                                </div>
 
-                                                {/* EXPANDED SOLUTION */}
+                                {/* Bottom Navigation */}
+                                <div className="mt-8 flex items-center justify-between border-t border-[#eeeeF2] pt-5">
+                                    <button
+                                        type="button"
+                                        onClick={
+                                            handlePrevious
+                                        }
+                                        disabled={
+                                            currentQuestion ===
+                                            0
+                                        }
+                                        className="inline-flex items-center gap-2 rounded-xl border border-[#dedee6] bg-white px-4 py-2.5 text-sm font-semibold text-[#454554] transition hover:bg-[#f7f7fa] disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        <ArrowLeft
+                                            size={17}
+                                        />
+                                        Previous
+                                    </button>
 
-                                                {isExpanded && (
-                                                    <div className="solution-details">
+                                    {currentQuestion <
+                                        test.questions.length -
+                                        1 ? (
+                                        <button
+                                            type="button"
+                                            onClick={
+                                                handleNext
+                                            }
+                                            className="inline-flex items-center gap-2 rounded-xl bg-[#5b4bdb] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4939c5]"
+                                        >
+                                            Next
+                                            <ArrowRight
+                                                size={17}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={
+                                                handleSubmit
+                                            }
+                                            className="inline-flex items-center gap-2 rounded-xl bg-[#5b4bdb] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4939c5]"
+                                        >
+                                            <Send
+                                                size={17}
+                                            />
+                                            Submit Test
+                                        </button>
+                                    )}
+                                </div>
+                            </article>
+                        </section>
 
-                                                        {/* USER ANSWER SUMMARY */}
+                        {/* =================================================
+                            QUESTION NAVIGATOR
+                        ================================================= */}
 
-                                                        <div className="answer-summary">
+                        <aside className="hidden lg:block">
+                            <div className="sticky top-36 rounded-2xl border border-[#e5e5eb] bg-white p-5 shadow-sm">
+                                <h3 className="text-sm font-bold text-[#17171c]">
+                                    Questions
+                                </h3>
 
-                                                            <div
-                                                                className={
-                                                                    isUnattempted
-                                                                        ? "summary-item summary-neutral"
-                                                                        : isCorrect
-                                                                            ? "summary-item summary-correct"
-                                                                            : "summary-item summary-wrong"
-                                                                }
-                                                            >
+                                <div className="mt-3 grid grid-cols-5 gap-2">
+                                    {test.questions.map(
+                                        (_, index) => {
+                                            const answered =
+                                                answers[
+                                                index
+                                                ] !== null;
 
-                                                                <span>
-                                                                    Your Answer
-                                                                </span>
+                                            const active =
+                                                currentQuestion ===
+                                                index;
 
-                                                                <strong>
-                                                                    {isUnattempted
-                                                                        ? "Not Attempted"
-                                                                        : `${String.fromCharCode(
-                                                                            65 +
-                                                                            (userAnswer ??
-                                                                                0)
-                                                                        )}. ${question
-                                                                            .options[
-                                                                        userAnswer ??
-                                                                        0
-                                                                        ]
-                                                                        }`}
-                                                                </strong>
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setCurrentQuestion(
+                                                            index
+                                                        )
+                                                    }
+                                                    className={`h-9 rounded-lg text-xs font-semibold transition ${active
+                                                            ? "bg-[#5b4bdb] text-white"
+                                                            : answered
+                                                                ? "bg-[#e8e5ff] text-[#5b4bdb]"
+                                                                : "bg-[#f3f3f6] text-[#697386] hover:bg-[#e9e9ee]"
+                                                        }`}
+                                                >
+                                                    {index + 1}
+                                                </button>
+                                            );
+                                        }
+                                    )}
+                                </div>
 
-                                                            </div>
+                                <div className="mt-5 space-y-2 border-t border-[#eeeeF2] pt-4 text-xs text-[#697386]">
+                                    <div className="flex items-center justify-between">
+                                        <span>
+                                            Answered
+                                        </span>
 
-                                                            <div className="summary-item summary-correct">
+                                        <span className="font-bold text-[#5b4bdb]">
+                                            {answeredCount}
+                                        </span>
+                                    </div>
 
-                                                                <span>
-                                                                    Correct Answer
-                                                                </span>
+                                    <div className="flex items-center justify-between">
+                                        <span>
+                                            Unanswered
+                                        </span>
 
-                                                                <strong>
-                                                                    {String.fromCharCode(
-                                                                        65 +
-                                                                        question.correctAnswer
-                                                                    )}
-                                                                    .{" "}
-                                                                    {
-                                                                        question.options[
-                                                                        question.correctAnswer
-                                                                        ]
-                                                                    }
-                                                                </strong>
-
-                                                            </div>
-
-                                                        </div>
-
-                                                        {/* OPTIONS */}
-
-                                                        <div className="solution-options">
-
-                                                            {question.options.map(
-                                                                (
-                                                                    option,
-                                                                    optionIndex
-                                                                ) => {
-                                                                    const isCorrectOption =
-                                                                        optionIndex ===
-                                                                        question.correctAnswer;
-
-                                                                    const isUserOption =
-                                                                        optionIndex ===
-                                                                        userAnswer;
-
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                optionIndex
-                                                                            }
-                                                                            className={`solution-option ${isCorrectOption
-                                                                                ? "answer-correct"
-                                                                                : ""
-                                                                                } ${isUserOption &&
-                                                                                    !isCorrectOption
-                                                                                    ? "answer-wrong"
-                                                                                    : ""
-                                                                                }`}
-                                                                        >
-
-                                                                            <span className="option-letter">
-                                                                                {String.fromCharCode(
-                                                                                    65 +
-                                                                                    optionIndex
-                                                                                )}
-                                                                            </span>
-
-                                                                            <span className="option-text">
-                                                                                {option}
-                                                                            </span>
-
-                                                                            {isCorrectOption && (
-                                                                                <span className="answer-label correct-label">
-                                                                                    ✓ Correct Answer
-                                                                                </span>
-                                                                            )}
-
-                                                                            {isUserOption &&
-                                                                                !isCorrectOption && (
-                                                                                    <span className="answer-label wrong-label">
-                                                                                        ✕ Your Answer
-                                                                                    </span>
-                                                                                )}
-
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                            )}
-
-                                                        </div>
-
-                                                        {/* EXPLANATION */}
-
-                                                        <div className="explanation-box">
-
-                                                            <div className="explanation-title">
-
-                                                                <CheckCircle2
-                                                                    size={18}
-                                                                />
-
-                                                                <span>
-                                                                    Solution /
-                                                                    Explanation
-                                                                </span>
-
-                                                            </div>
-
-                                                            <p>
-                                                                {
-                                                                    question.explanation
-                                                                }
-                                                            </p>
-
-                                                        </div>
-
-                                                    </div>
-                                                )}
-
-                                            </article>
-                                        );
-                                    }
-                                )}
-
+                                        <span className="font-bold text-[#697386]">
+                                            {unansweredCount}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-
-                        </div>
-
+                        </aside>
                     </div>
-                </section>
+                </div>
             </main>
         );
     }
 
     /*
-     * ==================================================
-     * REVIEW PAGE
-     * ==================================================
+     * =========================================================
+     * REVIEW MODE
+     * =========================================================
      */
 
     if (mode === "review") {
         return (
-            <main>
-                <QuizHeader
-                    title="Review Test"
-                    time={formattedTime}
-                />
+            <main className="min-h-screen bg-[#f7f7fa]">
+                <header className="sticky top-0 z-40 border-b bg-white">
+                    <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
+                        <div>
+                            <h1 className="text-base font-bold text-[#17171c] sm:text-lg">
+                                Review Test
+                            </h1>
 
-                <section className="quiz-container">
+                            <p className="text-xs text-[#697386]">
+                                Check your answers before
+                                submitting
+                            </p>
+                        </div>
 
-                    <div className="review-page">
+                        <div className="rounded-xl bg-[#f0efff] px-4 py-2 text-sm font-bold text-[#5b4bdb]">
+                            {answeredCount}/
+                            {test.questions.length} Answered
+                        </div>
+                    </div>
+                </header>
 
-                        <div className="review-header">
-
+                <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+                    {/* TOP REVIEW ACTIONS */}
+                    <div className="sticky top-16 z-30 mb-5 rounded-2xl border border-[#e5e5eb] bg-white/95 p-3 shadow-sm backdrop-blur-md sm:p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <p className="review-eyebrow">
-                                    FINAL REVIEW
+                                <p className="text-sm font-bold text-[#17171c]">
+                                    Ready to submit?
                                 </p>
 
-                                <h1>
-                                    Review your answers
-                                </h1>
-
-                                <p>
-                                    Check all your answers before
-                                    submitting the test.
+                                <p className="mt-1 text-xs text-[#697386]">
+                                    You can continue the test or
+                                    submit it now.
                                 </p>
                             </div>
 
-                            <div className="review-time">
-
-                                <Clock3 size={20} />
-
-                                <div>
-                                    <span>
-                                        Time Remaining
-                                    </span>
-
-                                    <strong>
-                                        {formattedTime}
-                                    </strong>
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        {/* REVIEW SUMMARY */}
-
-                        <div className="review-summary">
-
-                            <div className="review-stat">
-
-                                <div className="stat-icon total">
-                                    <ClipboardCheck
-                                        size={20}
-                                    />
-                                </div>
-
-                                <div>
-                                    <strong>
-                                        {test.questions.length}
-                                    </strong>
-
-                                    <span>
-                                        Total Questions
-                                    </span>
-                                </div>
-
-                            </div>
-
-                            <div className="review-stat">
-
-                                <div className="stat-icon attempted">
-                                    <CheckCircle2 size={20} />
-                                </div>
-
-                                <div>
-                                    <strong>
-                                        {answered}
-                                    </strong>
-
-                                    <span>
-                                        Attempted
-                                    </span>
-                                </div>
-
-                            </div>
-
-                            <div className="review-stat">
-
-                                <div className="stat-icon unanswered">
-                                    <AlertCircle size={20} />
-                                </div>
-
-                                <div>
-                                    <strong>
-                                        {unanswered}
-                                    </strong>
-
-                                    <span>
-                                        Unanswered
-                                    </span>
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        {/* QUESTIONS */}
-
-                        <div className="review-card">
-
-                            <div className="review-card-header">
-
-                                <div>
-                                    <h2>
-                                        Questions
-                                    </h2>
-
-                                    <p>
-                                        Click any question to
-                                        change your answer.
-                                    </p>
-                                </div>
-
-                            </div>
-
-                            <div className="review-questions">
-
-                                {test.questions.map(
-                                    (item, index) => {
-                                        const isAnswered =
-                                            answers[index] !== null;
-
-                                        return (
-                                            <button
-                                                key={item.id}
-                                                onClick={() => {
-                                                    setCurrent(index);
-
-                                                    setMode("attempt");
-
-                                                    window.scrollTo({
-                                                        top: 0,
-                                                        behavior: "smooth",
-                                                    });
-                                                }}
-                                                className={`review-question ${isAnswered
-                                                    ? "review-answered"
-                                                    : "review-unanswered"
-                                                    }`}
-                                            >
-
-                                                <span className="review-question-number">
-                                                    {index + 1}
-                                                </span>
-
-                                                <span className="review-question-content">
-
-                                                    <strong>
-                                                        Question{" "}
-                                                        {index + 1}
-                                                    </strong>
-
-                                                    <span>
-                                                        {isAnswered
-                                                            ? `Answer: ${String.fromCharCode(
-                                                                65 +
-                                                                (answers[
-                                                                    index
-                                                                ] ?? 0)
-                                                            )}`
-                                                            : "Not answered"}
-                                                    </span>
-
-                                                </span>
-
-                                                <ArrowRight
-                                                    size={18}
-                                                />
-
-                                            </button>
-                                        );
+                            <div className="flex w-full gap-2 sm:w-auto">
+                                <button
+                                    type="button"
+                                    onClick={
+                                        handleContinue
                                     }
-                                )}
+                                    className="quiz-action-btn flex-1 border border-[#dedee6] bg-white text-[#454554] hover:bg-[#f7f7fa] sm:flex-none"
+                                >
+                                    <ArrowLeft
+                                        size={17}
+                                    />
+                                    Continue Test
+                                </button>
 
+                                <button
+                                    type="button"
+                                    onClick={
+                                        handleConfirmSubmit
+                                    }
+                                    className="quiz-action-btn flex-1 bg-[#5b4bdb] text-white hover:bg-[#4939c5] sm:flex-none"
+                                >
+                                    <Send size={17} />
+                                    Submit Test
+                                </button>
                             </div>
-
                         </div>
-
-                        {/* REVIEW ACTIONS */}
-
-                        <div className="review-actions">
-
-                            <button
-                                onClick={continueTest}
-                                className="secondary-button large-button"
-                            >
-                                <ArrowLeft size={18} />
-                                Continue Test
-                            </button>
-
-                            <button
-                                onClick={submitTest}
-                                className="submit-button"
-                            >
-                                Submit Test
-                                <ArrowRight size={18} />
-                            </button>
-
-                        </div>
-
                     </div>
 
-                </section>
+                    {/* Review Summary */}
+                    <div className="mb-6 grid grid-cols-3 gap-3">
+                        <div className="rounded-2xl border border-[#e5e5eb] bg-white p-4">
+                            <p className="text-xs text-[#697386]">
+                                Answered
+                            </p>
+                            <p className="mt-1 text-2xl font-bold text-[#5b4bdb]">
+                                {answeredCount}
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-[#e5e5eb] bg-white p-4">
+                            <p className="text-xs text-[#697386]">
+                                Unanswered
+                            </p>
+                            <p className="mt-1 text-2xl font-bold text-[#697386]">
+                                {unansweredCount}
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-[#e5e5eb] bg-white p-4">
+                            <p className="text-xs text-[#697386]">
+                                Total
+                            </p>
+                            <p className="mt-1 text-2xl font-bold text-[#17171c]">
+                                {test.questions.length}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Review Questions */}
+                    <div className="space-y-4">
+                        {test.questions.map(
+                            (reviewQuestion, index) => {
+                                const answer =
+                                    answers[index];
+
+                                return (
+                                    <button
+                                        key={
+                                            reviewQuestion.id
+                                        }
+                                        type="button"
+                                        onClick={() =>
+                                            setCurrentQuestion(
+                                                index
+                                            )
+                                        }
+                                        className="w-full rounded-2xl border border-[#e5e5eb] bg-white p-5 text-left shadow-sm transition hover:border-[#c9c6f5] hover:shadow-md"
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <span
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${answer !==
+                                                        null
+                                                        ? "bg-[#f0efff] text-[#5b4bdb]"
+                                                        : "bg-[#f3f3f6] text-[#697386]"
+                                                    }`}
+                                            >
+                                                {index + 1}
+                                            </span>
+
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-semibold leading-6 text-[#17171c]">
+                                                    {
+                                                        reviewQuestion.question
+                                                    }
+                                                </p>
+
+                                                <p className="mt-2 text-xs text-[#697386]">
+                                                    {answer !==
+                                                        null
+                                                        ? `Your answer: ${reviewQuestion
+                                                            .options[
+                                                        answer
+                                                        ]
+                                                        }`
+                                                        : "Not attempted"}
+                                                </p>
+                                            </div>
+
+                                            {answer !==
+                                                null ? (
+                                                <CheckCircle2
+                                                    size={
+                                                        20
+                                                    }
+                                                    className="shrink-0 text-[#5b4bdb]"
+                                                />
+                                            ) : (
+                                                <Clock3
+                                                    size={
+                                                        20
+                                                    }
+                                                    className="shrink-0 text-[#9a9aa6]"
+                                                />
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            }
+                        )}
+                    </div>
+                </div>
             </main>
         );
     }
 
     /*
-     * ==================================================
-     * ATTEMPT PAGE
-     * ==================================================
+     * =========================================================
+     * RESULT MODE
+     * =========================================================
      */
 
     return (
-        <main>
-
-            <QuizHeader
-                title={test.title}
-                time={formattedTime}
-                warning={secondsLeft <= 60}
-            />
-
-            <section className="quiz-container">
-
-                {/* QUESTION TOP */}
-
-                <div className="question-top">
-
+        <main className="min-h-screen bg-[#f7f7fa]">
+            <header className="border-b bg-white">
+                <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
                     <div>
-                        <span className="question-counter">
-                            QUESTION {current + 1}
-                        </span>
+                        <h1 className="text-base font-bold text-[#17171c] sm:text-lg">
+                            Test Result
+                        </h1>
 
-                        <p className="question-count">
-                            of {test.questions.length}
+                        <p className="text-xs text-[#697386]">
+                            {test.title}
                         </p>
                     </div>
 
-                    <span className="answered-count">
-                        {answered} answered
-                    </span>
+                    <button
+                        type="button"
+                        onClick={handleRestart}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#dedee6] bg-white px-4 py-2 text-sm font-semibold text-[#454554] hover:bg-[#f7f7fa]"
+                    >
+                        <RotateCcw size={16} />
+                        Restart
+                    </button>
+                </div>
+            </header>
 
+            <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+                {/* Score */}
+                <section className="rounded-2xl border border-[#e5e5eb] bg-white p-6 text-center shadow-sm sm:p-10">
+                    <p className="text-sm font-semibold text-[#697386]">
+                        Your Score
+                    </p>
+
+                    <p className="mt-2 text-5xl font-bold text-[#5b4bdb] sm:text-6xl">
+                        {Number.isInteger(score)
+                            ? score
+                            : score.toFixed(2)}
+                    </p>
+
+                    <p className="mt-2 text-sm text-[#697386]">
+                        out of {test.questions.length}
+                    </p>
+
+                    <div className="mx-auto mt-5 h-3 max-w-md overflow-hidden rounded-full bg-[#eeeeF3]">
+                        <div
+                            className="h-full rounded-full bg-[#5b4bdb]"
+                            style={{
+                                width: `${Math.max(
+                                    0,
+                                    Math.min(
+                                        percentage,
+                                        100
+                                    )
+                                )}%`,
+                            }}
+                        />
+                    </div>
+
+                    <p className="mt-3 text-sm font-semibold text-[#454554]">
+                        {percentage.toFixed(2)}%
+                    </p>
+                </section>
+
+                {/* Stats */}
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-2xl border border-[#e5e5eb] bg-white p-5">
+                        <CheckCircle2
+                            size={20}
+                            className="text-green-600"
+                        />
+
+                        <p className="mt-3 text-xs text-[#697386]">
+                            Correct
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold text-[#17171c]">
+                            {correctCount}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#e5e5eb] bg-white p-5">
+                        <XCircle
+                            size={20}
+                            className="text-red-500"
+                        />
+
+                        <p className="mt-3 text-xs text-[#697386]">
+                            Wrong
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold text-[#17171c]">
+                            {wrongCount}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#e5e5eb] bg-white p-5">
+                        <Clock3
+                            size={20}
+                            className="text-[#697386]"
+                        />
+
+                        <p className="mt-3 text-xs text-[#697386]">
+                            Unattempted
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold text-[#17171c]">
+                            {test.questions.length -
+                                attemptedCount}
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#e5e5eb] bg-white p-5">
+                        <CheckCircle2
+                            size={20}
+                            className="text-[#5b4bdb]"
+                        />
+
+                        <p className="mt-3 text-xs text-[#697386]">
+                            Attempted
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold text-[#17171c]">
+                            {attemptedCount}
+                        </p>
+                    </div>
                 </div>
 
-                {/* PROGRESS */}
+                {/* Solutions */}
+                <section className="mt-8">
+                    <div className="mb-4">
+                        <h2 className="text-xl font-bold text-[#17171c]">
+                            Solutions
+                        </h2>
 
-                <div className="quiz-progress">
+                        <p className="mt-1 text-sm text-[#697386]">
+                            Click any question to view your
+                            answer, correct answer and
+                            explanation.
+                        </p>
+                    </div>
 
-                    <div
-                        className="quiz-progress-fill"
-                        style={{
-                            width:
-                                `${((current + 1) /
-                                    test.questions.length) *
-                                100
-                                }%`,
-                        }}
-                    />
+                    <div className="space-y-3">
+                        {test.questions.map(
+                            (resultQuestion, index) => {
+                                const userAnswer =
+                                    answers[index];
 
-                </div>
+                                const isCorrect =
+                                    userAnswer !== null &&
+                                    userAnswer ===
+                                    resultQuestion.correctAnswer;
 
-                <div className="quiz-layout">
+                                const isWrong =
+                                    userAnswer !== null &&
+                                    userAnswer !==
+                                    resultQuestion.correctAnswer;
 
-                    {/* QUESTION */}
+                                const isExpanded =
+                                    expandedQuestion ===
+                                    index;
 
-                    <div className="question-card">
-
-                        <div className="question-heading">
-
-                            <span>
-                                Question {current + 1}
-                            </span>
-
-                            <h1>
-                                {question.question}
-                            </h1>
-
-                        </div>
-
-                        {/* OPTIONS */}
-
-                        <div className="options-container">
-
-                            {question.options.map(
-                                (option, index) => {
-
-                                    const selected =
-                                        answers[current] ===
-                                        index;
-
-                                    return (
+                                return (
+                                    <div
+                                        key={
+                                            resultQuestion.id
+                                        }
+                                        className="overflow-hidden rounded-2xl border border-[#e5e5eb] bg-white"
+                                    >
                                         <button
-                                            key={index}
                                             type="button"
                                             onClick={() =>
-                                                chooseAnswer(index)
+                                                setExpandedQuestion(
+                                                    isExpanded
+                                                        ? null
+                                                        : index
+                                                )
                                             }
-                                            className={`quiz-option ${selected
-                                                ? "quiz-option-selected"
-                                                : ""
-                                                }`}
+                                            className="flex w-full items-center gap-4 p-5 text-left"
                                         >
-
                                             <span
-                                                className={`option-letter-large ${selected
-                                                    ? "option-letter-selected"
-                                                    : ""
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${isCorrect
+                                                        ? "bg-green-50 text-green-700"
+                                                        : isWrong
+                                                            ? "bg-red-50 text-red-600"
+                                                            : "bg-[#f3f3f6] text-[#697386]"
                                                     }`}
                                             >
-                                                {String.fromCharCode(
-                                                    65 + index
-                                                )}
+                                                {index + 1}
                                             </span>
 
-                                            <span className="quiz-option-text">
-                                                {option}
-                                            </span>
-
-                                            {selected && (
-                                                <span className="selected-check">
-                                                    <CheckCircle2
-                                                        size={20}
-                                                    />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block text-sm font-semibold leading-6 text-[#17171c]">
+                                                    {
+                                                        resultQuestion.question
+                                                    }
                                                 </span>
+
+                                                <span
+                                                    className={`mt-1 block text-xs font-semibold ${isCorrect
+                                                            ? "text-green-600"
+                                                            : isWrong
+                                                                ? "text-red-500"
+                                                                : "text-[#697386]"
+                                                        }`}
+                                                >
+                                                    {isCorrect
+                                                        ? "Correct"
+                                                        : isWrong
+                                                            ? "Wrong"
+                                                            : "Unattempted"}
+                                                </span>
+                                            </span>
+
+                                            {isExpanded ? (
+                                                <ChevronUp
+                                                    size={
+                                                        20
+                                                    }
+                                                    className="shrink-0 text-[#697386]"
+                                                />
+                                            ) : (
+                                                <ChevronDown
+                                                    size={
+                                                        20
+                                                    }
+                                                    className="shrink-0 text-[#697386]"
+                                                />
                                             )}
-
                                         </button>
-                                    );
-                                }
-                            )}
 
-                        </div>
+                                        {isExpanded && (
+                                            <div className="border-t border-[#eeeeF2] px-5 pb-5 pt-4">
+                                                {/* Your Answer */}
+                                                <div className="mb-4 rounded-xl bg-[#f7f7fa] p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-[#697386]">
+                                                        Your
+                                                        Answer
+                                                    </p>
 
-                        {/* NAVIGATION */}
+                                                    <p className="mt-1 text-sm font-semibold text-[#17171c]">
+                                                        {userAnswer !==
+                                                            null
+                                                            ? resultQuestion
+                                                                .options[
+                                                            userAnswer
+                                                            ]
+                                                            : "Not attempted"}
+                                                    </p>
+                                                </div>
 
-                        <div className="question-navigation">
+                                                {/* Correct Answer */}
+                                                <div className="mb-5 rounded-xl bg-green-50 p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-green-700">
+                                                        Correct
+                                                        Answer
+                                                    </p>
 
-                            <button
-                                type="button"
-                                disabled={current === 0}
-                                onClick={previousQuestion}
-                                className="navigation-secondary"
-                            >
-                                <ArrowLeft size={18} />
-                                Previous
-                            </button>
+                                                    <p className="mt-1 text-sm font-semibold text-green-800">
+                                                        {
+                                                            resultQuestion
+                                                                .options[
+                                                            resultQuestion.correctAnswer
+                                                            ]
+                                                        }
+                                                    </p>
+                                                </div>
 
-                            {current ===
-                                test.questions.length - 1 ? (
+                                                {/* Options */}
+                                                <div className="space-y-2">
+                                                    {resultQuestion.options.map(
+                                                        (
+                                                            option,
+                                                            optionIndex
+                                                        ) => {
+                                                            const isAnswer =
+                                                                userAnswer ===
+                                                                optionIndex;
 
-                                <button
-                                    type="button"
-                                    onClick={openReview}
-                                    className="navigation-primary"
-                                >
-                                    Review Test
-                                    <ClipboardCheck size={18} />
-                                </button>
+                                                            const isCorrectOption =
+                                                                resultQuestion.correctAnswer ===
+                                                                optionIndex;
 
-                            ) : (
+                                                            let optionClass =
+                                                                "border-[#e5e5eb] bg-white";
 
-                                <button
-                                    type="button"
-                                    onClick={nextQuestion}
-                                    className="navigation-primary"
-                                >
-                                    Next
-                                    <ArrowRight size={18} />
-                                </button>
+                                                            if (
+                                                                isCorrectOption
+                                                            ) {
+                                                                optionClass =
+                                                                    "border-green-300 bg-green-50";
+                                                            } else if (
+                                                                isAnswer
+                                                            ) {
+                                                                optionClass =
+                                                                    "border-red-300 bg-red-50";
+                                                            }
 
-                            )}
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        optionIndex
+                                                                    }
+                                                                    className={`flex items-center gap-3 rounded-xl border p-3 ${optionClass}`}
+                                                                >
+                                                                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold">
+                                                                        {String.fromCharCode(
+                                                                            65 +
+                                                                            optionIndex
+                                                                        )}
+                                                                    </span>
 
-                        </div>
+                                                                    <span className="text-sm font-medium text-[#30303a]">
+                                                                        {
+                                                                            option
+                                                                        }
+                                                                    </span>
 
+                                                                    {isCorrectOption && (
+                                                                        <CheckCircle2
+                                                                            size={
+                                                                                18
+                                                                            }
+                                                                            className="ml-auto shrink-0 text-green-600"
+                                                                        />
+                                                                    )}
+
+                                                                    {isAnswer &&
+                                                                        !isCorrectOption && (
+                                                                            <XCircle
+                                                                                size={
+                                                                                    18
+                                                                                }
+                                                                                className="ml-auto shrink-0 text-red-500"
+                                                                            />
+                                                                        )}
+                                                                </div>
+                                                            );
+                                                        }
+                                                    )}
+                                                </div>
+
+                                                {/* Explanation */}
+                                                <div className="mt-5 rounded-xl border border-[#e5e5eb] bg-[#fafafa] p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-[#697386]">
+                                                        Explanation
+                                                    </p>
+
+                                                    <p className="mt-2 text-sm leading-6 text-[#454554]">
+                                                        {
+                                                            resultQuestion.explanation
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        )}
                     </div>
-
-                    {/* SIDEBAR */}
-
-                    <aside className="question-sidebar">
-
-                        <div className="sidebar-title">
-
-                            <h3>
-                                Questions
-                            </h3>
-
-                            <span>
-                                {answered}/
-                                {test.questions.length}
-                            </span>
-
-                        </div>
-
-                        <div className="question-grid">
-
-                            {test.questions.map(
-                                (item, index) => {
-
-                                    const selected =
-                                        current === index;
-
-                                    const answeredQuestion =
-                                        answers[index] !== null;
-
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() =>
-                                                setCurrent(index)
-                                            }
-                                            className={`question-number-button ${selected
-                                                ? "question-number-active"
-                                                : ""
-                                                } ${answeredQuestion
-                                                    ? "question-number-answered"
-                                                    : ""
-                                                }`}
-                                        >
-                                            {index + 1}
-                                        </button>
-                                    );
-                                }
-                            )}
-
-                        </div>
-
-                        {/* LEGEND */}
-
-                        <div className="sidebar-legend">
-
-                            <div>
-                                <span className="legend-box current" />
-                                Current
-                            </div>
-
-                            <div>
-                                <span className="legend-box answered" />
-                                Answered
-                            </div>
-
-                            <div>
-                                <span className="legend-box pending" />
-                                Not Answered
-                            </div>
-
-                        </div>
-
-                        {/* REVIEW */}
-
-                        <button
-                            onClick={openReview}
-                            className="sidebar-review-button"
-                        >
-                            <ClipboardCheck size={18} />
-                            Review Test
-                        </button>
-
-                    </aside>
-
-                </div>
-
-            </section>
-
-        </main>
-    );
-}
-
-/*
- * ==================================================
- * QUIZ HEADER
- * ==================================================
- */
-
-function QuizHeader({
-    title,
-    time,
-    warning = false,
-}: {
-    title: string;
-    time: string | null;
-    warning?: boolean;
-}) {
-    return (
-        <header className="quiz-header">
-
-            <div className="quiz-header-inner">
-
-                <Link
-                    href="/tests"
-                    className="back-to-tests"
-                >
-                    <ArrowLeft size={18} />
-                    Tests
-                </Link>
-
-                <div className="quiz-title">
-                    {title}
-                </div>
-
-                {time !== null && (
-                    <div
-                        className={`top-timer ${warning
-                            ? "top-timer-warning"
-                            : ""
-                            }`}
-                    >
-                        <Clock3 size={19} />
-
-                        <div>
-                            <span>
-                                Time Remaining
-                            </span>
-
-                            <strong>
-                                {time}
-                            </strong>
-                        </div>
-
-                    </div>
-                )}
-
+                </section>
             </div>
-
-        </header>
+        </main>
     );
 }
