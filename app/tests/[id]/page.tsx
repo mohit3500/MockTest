@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { getTest } from "@/lib/History1-8";
+
+import { getTestById } from "@/lib/all-tests";
+
 import QuizClient from "@/components/QuizClient";
 import Navbar from "@/components/Navbar";
 
@@ -12,7 +14,7 @@ export default async function TestPage({
 }) {
     const { id } = await params;
 
-    const test = getTest(id);
+    const test = getTestById(id);
 
     if (!test) {
         notFound();
@@ -21,7 +23,6 @@ export default async function TestPage({
     return (
         <>
             <Navbar />
-
             <QuizClient test={test} />
         </>
     );

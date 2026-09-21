@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import TestCard from "@/components/TestCard";
-import { tests } from "@/lib/History1-8";
+import { allTests } from "@/lib/all-tests";
 
 export default function TestsPage() {
     return (
@@ -15,13 +15,13 @@ export default function TestsPage() {
                         </h1>
 
                         <p className="mt-2 text-[#697386]">
-                            Practice, improve your score and track
-                            your performance.
+                            Practice, improve your score and track your
+                            performance.
                         </p>
                     </div>
 
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        {tests.map((test) => (
+                    <div className="mt-2 grid gap-6">
+                        {allTests.map((test) => (
                             <TestCard
                                 key={test.id}
                                 test={test}

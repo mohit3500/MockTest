@@ -6718,10 +6718,10 @@ export const INDIAN_HISTORY_FIRST_8_CHAPTERS: Test =
 }
     ;
 
-export const tests: Test[] = [
+export const tests1: Test[] = [
     INDIAN_HISTORY_FIRST_8_CHAPTERS,
 ];
 
-export function getTest(id: string): Test | undefined {
-    return tests.find((test) => test.id === id);
+export function getTest1(id: string): Test | undefined {
+    return tests1.find((test) => test.id === id);
 }
