@@ -13,6 +13,8 @@ export const INDIAN_HISTORY_FIRST_8_CHAPTERS: Test =
     "description": "Combined mock test containing all 555 questions from the first 8 chapters of the Indian History book.",
     "category": "भारतीय इतिहास",
     "durationMinutes": 277.5,
+    "isPaid": true,
+    "price": 1,
     "questions": [
         {
             "id": "ch1-q2",

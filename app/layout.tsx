@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { AuthProvider } from "@/components/AuthProvider";
+
 export const metadata: Metadata = {
-  title: "Quiz Simulator",
-  description: "Online quiz simulator",
+  title: "Mock Test Platform",
+  description: "Practice mock tests and improve your score",
 };
 
 export default function RootLayout({
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }

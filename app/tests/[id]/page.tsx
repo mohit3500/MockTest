@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-
 import { getTest } from "@/lib/History1-8";
 import QuizClient from "@/components/QuizClient";
+import Navbar from "@/components/Navbar";
 
 export default async function TestPage({
     params,
@@ -18,5 +18,11 @@ export default async function TestPage({
         notFound();
     }
 
-    return <QuizClient test={test} />;
+    return (
+        <>
+            <Navbar />
+
+            <QuizClient test={test} />
+        </>
+    );
 }

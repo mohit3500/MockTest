@@ -6,11 +6,14 @@ export type Question = {
     explanation: string;
 };
 
-export type Test = {
+export interface Test {
     id: string;
     title: string;
     description: string;
     category: string;
     durationMinutes: number;
     questions: Question[];
-};
+
+    isPaid?: boolean;
+    price?: number;
+}
