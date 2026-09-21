@@ -1,3 +1,5 @@
+import "server-only";
+
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -10,9 +12,7 @@ const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
 );
 
 if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-        "Missing Firebase Admin environment variables."
-    );
+    throw new Error("Missing Firebase Admin environment variables.");
 }
 
 const adminApp =
