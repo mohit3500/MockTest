@@ -9,6 +9,8 @@ import { test5 } from "@/lib/Medieval7-9"
 import { test6 } from "@/lib/Medieval10-12"
 import { test8 } from "@/lib/History9-15Part2"
 import { test9 } from "@/lib/Medieval13-15"
+import { test10 } from "@/lib/Medieval16-18"
+
 
 export const allTests: Test[] = [
     ...test1,
@@ -20,6 +22,7 @@ export const allTests: Test[] = [
     ...test5,
     ...test6,
     ...test9,
+    ...test10,
 ];
 
 export function getTestById(id: string): Test | undefined {
