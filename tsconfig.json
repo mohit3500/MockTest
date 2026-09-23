@@ -35,7 +35,8 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    "app/api/payment/check-access"
+    "app/api/payment/check-access",
+    "lib/History1-8.Part1ts"
   ],
   "exclude": [
     "node_modules"
