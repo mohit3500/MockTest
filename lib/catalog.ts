@@ -23,6 +23,10 @@ import { worldGeo1_13 } from "./WorldGeo1-13";
 import { worldGeo14_26 } from "./World14-26";
 import { worldGeo27_39 } from "./World27-39";
 import { worldGeo40_52 } from "./World40-52";
+import { testModern2130 } from "./Modern21-30";
+import { testModern3140 } from "./Modern31-40";
+import { testModern4152 } from "./Modern41-52";
+import { testModern5354 } from "./Modern53-54";
 
 /*
  * =========================================================
@@ -90,7 +94,7 @@ export const subjects: Subject[] = [
                 id: "modern",
                 title: "Modern History",
                 description: "Modern Indian History chapters 1–20.",
-                tests: [...test13, ...test14, ...test15, ...test16],
+                tests: [...test13, ...test14, ...test15, ...test16, ...testModern2130, ...testModern3140, ...testModern4152, ...testModern5354],
             },
             {
                 id: "art-culture",
