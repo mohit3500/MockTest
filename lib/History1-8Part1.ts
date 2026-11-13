@@ -9,8 +9,6 @@ export const INDIAN_HISTORY_FIRST_8_PART_1: Test = {
     description: "First half of the original 555-question Indian History Chapters 1–8 test. Contains questions 1–278.",
     category: "भारतीय इतिहास",
     durationMinutes: 139,
-    isPaid: true,
-    price: 1,
     questions: [
         {
             "id": "ch1-q2",
