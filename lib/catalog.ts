@@ -27,6 +27,11 @@ import { testModern2130 } from "./Modern21-30";
 import { testModern3140 } from "./Modern31-40";
 import { testModern4152 } from "./Modern41-52";
 import { testModern5355 } from "./Modern53-54";
+import { GeoPyq1 } from "./GeoPyq1";
+import { GeoPyq2 } from "./GeoPyq2";
+import { GeoPyq3 } from "./GeoPyq3";
+import { GeoPyq4 } from "./GeoPyq4";
+import { GeoPyq5 } from "./GeoPyq5";
 
 /*
  * =========================================================
@@ -209,7 +214,12 @@ export const subjects: Subject[] = [
                 id: "full-papers",
                 title: "Full Papers",
                 description: "Complete previous year papers, year by year.",
-                tests: [],
+                tests: [...GeoPyq1,
+                ...GeoPyq2,
+                ...GeoPyq3,
+                ...GeoPyq4,
+                ...GeoPyq5
+                ],
             },
             {
                 id: "topic-wise",
