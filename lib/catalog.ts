@@ -32,6 +32,25 @@ import { GeoPyq2 } from "./GeoPyq2";
 import { GeoPyq3 } from "./GeoPyq3";
 import { GeoPyq4 } from "./GeoPyq4";
 import { GeoPyq5 } from "./GeoPyq5";
+import { ancient_part1 } from "./ancient-history-pyq-part-1";
+import { ancient_part2 } from "./ancient-history-pyq-part-2";
+import { economic_social_development_part1 } from "./economic-social-development-pyq-part-1";
+import { economic_social_development_part2 } from "./economic-social-development-pyq-part-2";
+import { economic_social_development_part3 } from "./economic-social-development-pyq-part-3";
+import { economic_social_development_part4 } from "./economic-social-development-pyq-part-4";
+import { environment_ecology_part1 } from "./environment-ecology-pyq-part-1";
+import { environment_ecology_part2 } from "./environment-ecology-pyq-part-2";
+import { general_science_part1 } from "./general-science-pyq-part-1";
+import { general_science_part2 } from "./general-science-pyq-part-2";
+import { general_science_part3 } from "./general-science-pyq-part-3";
+import { general_science_part4 } from "./general-science-pyq-part-4";
+import { medieval_history_part1 } from "./medieval-history-pyq-part-1";
+import { medieval_history_part2 } from "./medieval-history-pyq-part-2";
+import { uttar_pradesh_special_part1 } from "./uttar-pradesh-special-pyq-part-1";
+import { uttar_pradesh_special_part2 } from "./uttar-pradesh-special-pyq-part-2";
+import { polity_part1 } from "./polity-pyq-part-1";
+import { polity_part2 } from "./polity-pyq-part-2";
+import { polity_part3 } from "./polity-pyq-part-3";
 
 /*
  * =========================================================
@@ -214,18 +233,39 @@ export const subjects: Subject[] = [
                 id: "full-papers",
                 title: "Full Papers",
                 description: "Complete previous year papers, year by year.",
-                tests: [...GeoPyq1,
-                ...GeoPyq2,
-                ...GeoPyq3,
-                ...GeoPyq4,
-                ...GeoPyq5
+                tests: [
                 ],
             },
             {
                 id: "topic-wise",
                 title: "Topic-wise PYQs",
                 description: "Previous year questions grouped by topic.",
-                tests: [],
+                tests: [
+                    ...GeoPyq1,
+                ...GeoPyq2,
+                ...GeoPyq3,
+                ...GeoPyq4,
+                ...GeoPyq5,
+                ...ancient_part1,
+                ...ancient_part2,
+                ...economic_social_development_part1,
+                ...economic_social_development_part2,
+                ...economic_social_development_part3,
+                ...economic_social_development_part4,
+                ...environment_ecology_part1,
+                ...environment_ecology_part2,
+                ...general_science_part1,
+                ...general_science_part2,
+                ...general_science_part3,
+                ...general_science_part4,
+                ...medieval_history_part1,
+                ...medieval_history_part2,
+                ...polity_part1,
+                ...polity_part2,
+                ...polity_part3,
+                ...uttar_pradesh_special_part1,
+                ...uttar_pradesh_special_part2,
+                ],
             },
         ],
     },
